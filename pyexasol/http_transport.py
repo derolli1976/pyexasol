@@ -124,7 +124,7 @@ class ExaSQLExportThread(ExaSQLThread):
             parts.append(f"COLUMN SEPARATOR = {self.connection.format.quote(self.params['column_separator'])}")
 
         if self.params.get('column_delimiter'):
-            parts.append("COLUMN DELIMITER = {self.connection.format.quote(self.params['column_delimiter']}")
+            parts.append(f"COLUMN DELIMITER = {self.connection.format.quote(self.params['column_delimiter']}")
 
         if self.params.get('with_column_names'):
             parts.append("WITH COLUMN NAMES")
@@ -175,7 +175,7 @@ class ExaSQLImportThread(ExaSQLThread):
             parts.append(f"COLUMN SEPARATOR = {self.connection.format.quote(self.params['column_separator'])}")
 
         if self.params.get('column_delimiter'):
-            parts.append("COLUMN DELIMITER = {self.connection.format.quote(self.params['column_delimiter'])}")
+            parts.append(f"COLUMN DELIMITER = {self.connection.format.quote(self.params['column_delimiter'])}")
 
         self.connection.execute("\n".join(parts))
 
