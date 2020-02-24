@@ -13,6 +13,8 @@ class ExaExtension(object):
 
     def get_columns(self, object_name):
         """
+        DEPRECATED, please use `.meta.query_columns` instead
+
         Get information about columns of table or view (Websocket format)
         Object name may be passed as tuple to specify custom schema
         """
@@ -21,6 +23,8 @@ class ExaExtension(object):
 
     def get_columns_sql(self, query, query_params=None):
         """
+        DEPRECATED, please use `.meta.query_columns` instead
+
         Get columns of SQL query without executing it (Websocket format)
         It relies on prepared statement which is closed immediately without execution
         """
@@ -67,6 +71,8 @@ class ExaExtension(object):
 
     def get_sys_columns(self, object_name):
         """
+        DEPRECATED, please use `.meta.object_columns` instead
+
         Get information about columns of table or view (SYS format)
         Object name may be passed as tuple to specify custom schema
         """

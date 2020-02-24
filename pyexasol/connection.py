@@ -21,6 +21,7 @@ from .statement import ExaStatement
 from .logger import ExaLogger
 from .formatter import ExaFormatter
 from .ext import ExaExtension
+from .meta import ExaMetaData
 from .script_output import ExaScriptOutputProcess
 from .version import __version__
 
@@ -30,6 +31,7 @@ class ExaConnection(object):
     cls_formatter = ExaFormatter
     cls_logger = ExaLogger
     cls_extension = ExaExtension
+    cls_meta = ExaMetaData
 
     """
     Threads may share the module, but not connections
@@ -157,6 +159,7 @@ class ExaConnection(object):
         self._init_ws()
         self._init_json()
         self._init_ext()
+        self._init_meta()
 
         self._login()
         self.get_attr()
@@ -185,28 +188,31 @@ class ExaConnection(object):
             stmt_output_dir
         )
 
-        script_output.start()
-
-        # This option is useful to get around complex network setups, like Exasol running in Docker containers
-        if self.options['udf_output_connect_address']:
-            address = f"{self.options['udf_output_connect_address'][0]}:{self.options['udf_output_connect_address'][1]}"
-        else:
-            address = script_output.get_output_address()
-
-        self.execute("ALTER SESSION SET SCRIPT_OUTPUT_ADDRESS = {address}", {'address': address})
-
         try:
+            script_output.start()
+
+            # This option is useful to get around complex network setups, like Exasol running in Docker containers
+            if self.options['udf_output_connect_address']:
+                address = f"{self.options['udf_output_connect_address'][0]}:{self.options['udf_output_connect_address'][1]}"
+            else:
+                address = script_output.get_output_address()
+
+            self.execute("ALTER SESSION SET SCRIPT_OUTPUT_ADDRESS = {address}", {'address': address})
+
             stmt = self.execute(query, query_params)
             log_files = sorted(list(stmt_output_dir.glob('*.log')))
 
             if len(log_files) > 0:
-                script_output.join()
+                script_output.join_with_exc()
             else:
                 # In some cases Exasol does not run any VM's even when UDF scripts are being called
                 # In this case we must terminate TCP server, since it won't stop automatically
                 script_output.terminate()
+                script_output.join()
         except ExaQueryError:
             script_output.terminate()
+            script_output.join()
+
             raise
 
         return stmt, log_files
@@ -232,7 +238,7 @@ class ExaConnection(object):
 
     def open_schema(self, schema):
         self.set_attr({
-            'currentSchema': self.format.default_format_ident(schema)
+            'currentSchema': schema
         })
 
     def current_schema(self):
@@ -281,28 +287,39 @@ class ExaConnection(object):
         if query_params is not None:
             query_or_table = self.format.format(query_or_table, **query_params)
 
+        http_proc = ExaHTTPProcess(self.ws_host, self.ws_port, compression, self.options['encryption'], HTTP_EXPORT)
+        sql_thread = ExaSQLExportThread(self, compression, query_or_table, export_params)
+
         try:
-            http_proc = ExaHTTPProcess(self.ws_host, self.ws_port, compression, self.options['encryption'], HTTP_EXPORT)
             http_proc.start()
 
-            sql_thread = ExaSQLExportThread(self, http_proc.get_proxy(), compression, query_or_table, export_params)
             sql_thread.set_http_proc(http_proc)
+            sql_thread.set_exa_proxy_list(http_proc.get_proxy())
+
             sql_thread.start()
 
             result = callback(http_proc.read_pipe, dst, **callback_params)
             http_proc.read_pipe.close()
 
-            http_proc.join()
-            sql_thread.join()
+            http_proc.join_with_exc()
+            sql_thread.join_with_exc()
 
             return result
         except Exception as e:
-            # Close HTTP Server if it is still running
-            if 'http_proc' in locals():
-                http_proc.terminate()
+            # Terminate HTTP Server if it is still running
+            http_proc.terminate()
+            http_proc.join()
+
+            # Try to join SQL thread, but no longer than 1 second
+            sql_thread.join(1)
+
+            # If SQL thread is still running somehow, abort query and join again
+            if sql_thread.is_alive():
+                self.abort_query()
+                sql_thread.join()
 
             # Give higher priority to SQL thread exception
-            if 'sql_thread' in locals() and sql_thread.exc:
+            if sql_thread.exc:
                 raise sql_thread.exc
 
             raise e
@@ -324,28 +341,39 @@ class ExaConnection(object):
         if not callable(callback):
             raise ValueError('Callback argument is not callable')
 
+        http_proc = ExaHTTPProcess(self.ws_host, self.ws_port, compression, self.options['encryption'], HTTP_IMPORT)
+        sql_thread = ExaSQLImportThread(self, compression, table, import_params)
+
         try:
-            http_proc = ExaHTTPProcess(self.ws_host, self.ws_port, compression, self.options['encryption'], HTTP_IMPORT)
             http_proc.start()
 
-            sql_thread = ExaSQLImportThread(self, http_proc.get_proxy(), compression, table, import_params)
             sql_thread.set_http_proc(http_proc)
+            sql_thread.set_exa_proxy_list(http_proc.get_proxy())
+
             sql_thread.start()
 
             result = callback(http_proc.write_pipe, src, **callback_params)
             http_proc.write_pipe.close()
 
-            http_proc.join()
-            sql_thread.join()
+            http_proc.join_with_exc()
+            sql_thread.join_with_exc()
 
             return result
         except Exception as e:
-            # Close HTTP Server if it is still running
-            if 'http_proc' in locals():
-                http_proc.terminate()
+            # Terminate HTTP Server if it is still running
+            http_proc.terminate()
+            http_proc.join()
+
+            # Try to join SQL thread, but no longer than 1 second
+            sql_thread.join(1)
+
+            # If SQL thread is still running somehow, abort query in the main thread and join SQL thread again
+            if sql_thread.is_alive():
+                self.abort_query()
+                sql_thread.join()
 
             # Give higher priority to SQL thread exception
-            if 'sql_thread' in locals() and sql_thread.exc:
+            if sql_thread.exc:
                 raise sql_thread.exc
 
             raise e
@@ -371,7 +399,8 @@ class ExaConnection(object):
 
         # There is no need to run separate thread here, all work is performed in child processes
         # We simply reuse thread class to keep logic in one place
-        sql_thread = ExaSQLExportThread(self, exa_proxy_list, compression, query_or_table, export_params)
+        sql_thread = ExaSQLExportThread(self, compression, query_or_table, export_params)
+        sql_thread.set_exa_proxy_list(exa_proxy_list)
         sql_thread.run_sql()
 
     def import_parallel(self, exa_proxy_list, table, import_params=None):
@@ -392,7 +421,8 @@ class ExaConnection(object):
 
         # There is no need to run separate thread here, all work is performed in child processes
         # We simply reuse thread class to keep logic in one place
-        sql_thread = ExaSQLImportThread(self, exa_proxy_list, compression, table, import_params)
+        sql_thread = ExaSQLImportThread(self, compression, table, import_params)
+        sql_thread.set_exa_proxy_list(exa_proxy_list)
         sql_thread.run_sql()
 
     def session_id(self):
@@ -731,6 +761,9 @@ class ExaConnection(object):
 
     def _init_ext(self):
         self.ext = self.cls_extension(self)
+
+    def _init_meta(self):
+        self.meta = self.cls_meta(self)
 
     def _get_stmt_output_dir(self):
         import pathlib
