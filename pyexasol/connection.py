@@ -238,7 +238,7 @@ class ExaConnection(object):
 
     def open_schema(self, schema):
         self.set_attr({
-            'currentSchema': schema
+            'currentSchema': self.format.default_format_ident_value(schema)
         })
 
     def current_schema(self):
