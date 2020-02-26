@@ -8,6 +8,7 @@ class ExaMetaData(object):
     """
     def __init__(self, connection):
         self.connection = weakref.proxy(connection)
+        self.sql_keywords = None
 
     def query_columns(self, query, query_params=None):
         """
@@ -176,14 +177,33 @@ class ExaMetaData(object):
 
         return st.fetchall()
 
-    def _execute(self, query, query_params=None):
-        # fetch_dict=True is enforced to prevent people from relying on order of columns in system views
-        # which is subject to change between Exasol versions
+    def list_sql_keywords(self):
+        """
+        Get reserved SQL keywords which cannot be used as identifiers without double-quote escaping
+        Never hard-code this list! It changes with every Exasol versions
+        """
+        if not self.sql_keywords:
+            st = self._execute_snapshot("""
+                SELECT keyword
+                FROM EXA_SQL_KEYWORDS
+                WHERE reserved IS TRUE
+                ORDER BY keyword
+            """)
+
+            self.sql_keywords = st.fetchcol()
+
+        return self.sql_keywords
+
+    def _execute_snapshot(self, query, query_params=None):
+        """
+        Execute query in snapshot transaction mode using SQL hint
+        fetch_dict=True is enforced to prevent users from relying on order of columns in system views
+        """
         options = {
             'fetch_dict': True,
         }
 
-        return self.connection.cls_statement(self.connection, query, query_params, **options)
+        return self.connection.cls_statement(self.connection, f"/*snapshot execution*/{query}", query_params, **options)
 
-    def _execute_snapshot(self, query, query_params=None):
-        return self._execute(f"/*snapshot execution*/{query}", query_params)
+    def __repr__(self):
+        return f'<{self.__class__.__name__} session_id={self.connection.session_id()}>'

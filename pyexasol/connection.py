@@ -50,6 +50,7 @@ class ExaConnection(object):
             , schema=''
             , autocommit=constant.DEFAULT_AUTOCOMMIT
             , snapshot_transactions=False
+            , connection_timeout=constant.DEFAULT_CONNECTION_TIMEOUT
             , socket_timeout=constant.DEFAULT_SOCKET_TIMEOUT
             , query_timeout=constant.DEFAULT_QUERY_TIMEOUT
             , compression=False
@@ -80,7 +81,8 @@ class ExaConnection(object):
         :param schema: Open schema after connection (Default: '', no schema)
         :param autocommit: Enable autocommit on connection (Default: True)
         :param snapshot_transactions: Enable snapshot transactions on connection (Default: False)
-        :param socket_timeout: Socket timeout in seconds passed directly to websocket (Default: 10)
+        :param connection_timeout: Socket timeout in seconds used to establish connection (Default: 10)
+        :param socket_timeout: Socket timeout in seconds used after connection was established (Default: 30)
         :param query_timeout: Maximum execution time of queries before automatic abort, in seconds (Default: 0, no timeout)
         :param compression: Use zlib compression both for WebSocket and HTTP transport (Default: False)
         :param encryption: Use SSL to encrypt client-server communications for WebSocket and HTTP transport (Default: False)
@@ -110,6 +112,7 @@ class ExaConnection(object):
             'autocommit': autocommit,
             'snapshot_transactions': snapshot_transactions,
 
+            'connection_timeout': connection_timeout,
             'socket_timeout': socket_timeout,
             'query_timeout': query_timeout,
             'compression': compression,
@@ -615,6 +618,7 @@ class ExaConnection(object):
 
             try:
                 self._ws = websocket.create_connection(f'{ws_prefix}{host}:{port}', **ws_options)
+                self._ws.settimeout(self.options['socket_timeout'])
 
                 self.ws_host = host
                 self.ws_port = port
@@ -624,7 +628,7 @@ class ExaConnection(object):
 
                 return
             except Exception as e:
-                self.logger.debug(f'Failed to connect [{host}:{port}]')
+                self.logger.debug(f'Failed to connect [{host}:{port}]: {e}')
 
                 failed_attempts += 1
 
@@ -633,7 +637,7 @@ class ExaConnection(object):
 
     def _get_ws_options(self):
         options = {
-            'timeout': self.options['socket_timeout'],
+            'timeout': self.options['connection_timeout'],
             'skip_utf8_validation': True,
             'enable_multithread': True,     # Extra lock is necessary to protect abort_query() calls
         }
