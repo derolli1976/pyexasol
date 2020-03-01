@@ -1,16 +1,17 @@
-import weakref
 
 
 class ExaMetaData(object):
     """
     This class implements lock-free meta data requests using `/*snapshot execution*/` SQL hint described in IDEA-476
     https://www.exasol.com/support/browse/IDEA-476
+
+    If you still get locks, please make sure to update Exasol server to the latest minor version
     """
     def __init__(self, connection):
-        self.connection = weakref.proxy(connection)
+        self.connection = connection
         self.sql_keywords = None
 
-    def query_columns(self, query, query_params=None):
+    def sql_columns(self, query, query_params=None):
         """
         Get result set columns of SQL query without executing it
         """
@@ -113,16 +114,19 @@ class ExaMetaData(object):
 
         return st.fetchall()
 
-    def list_columns(self, column_schema_pattern='%', column_table_pattern='%', column_name_pattern='%'):
+    def list_columns(self, column_schema_pattern='%', column_table_pattern='%'
+                     , column_object_type_pattern='%', column_name_pattern='%'):
         st = self._execute_snapshot("""
             SELECT *
             FROM sys.exa_all_columns
             WHERE column_schema LIKE {column_schema_pattern}
                 AND column_table LIKE {column_table_pattern}
+                AND column_object_type LIKE {column_object_type_pattern}
                 AND column_name LIKE {column_name_pattern}
         """, {
             'column_schema_pattern': column_schema_pattern,
             'column_table_pattern': column_table_pattern,
+            'column_object_type_pattern': column_object_type_pattern,
             'column_name_pattern': column_name_pattern,
         })
 
@@ -180,7 +184,7 @@ class ExaMetaData(object):
     def list_sql_keywords(self):
         """
         Get reserved SQL keywords which cannot be used as identifiers without double-quote escaping
-        Never hard-code this list! It changes with every Exasol versions
+        Never hardcode this list! It might change with next Exasol server version without warning
         """
         if not self.sql_keywords:
             st = self._execute_snapshot("""

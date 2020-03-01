@@ -54,6 +54,18 @@ This page contains complete reference of PyEXASOL public API.
   - [safe_ident()](#safe_ident)
   - [safe_float()](#safe_float)
   - [safe_decimal()](#safe_decimal)
+- [ExaMetaData](#exametadata)
+  - [sql_columns()](#sql_columns)
+  - [schema_exists()](#schema_exists)
+  - [table_exists()](#table_exists)
+  - [view_exists()](#view_exists)
+  - [list_schemas()](#list_schemas)
+  - [list_tables()](#list_tables)
+  - [list_views()](#list_views)
+  - [list_columns()](#list_views)
+  - [list_objects()](#list_objects)
+  - [list_object_sizes()](#list_object_sizes)
+  - [list_sql_keywords()](#list_sql_keywords)
 - [ExaHTTPTransportWrapper](#exahttptransportwrapper)
   - [get_proxy()](#exahttptransportwrapperget_proxy)
   - [export_to_callback()](#exahttptransportwrapperexport_to_callback)
@@ -81,7 +93,8 @@ Opens new connection and returns `ExaConnection` object.
 | `schema` | `ingres` | Open schema after connection (Default: `''`, no schema) |
 | `autocommit` | `True` | Enable autocommit on connection (Default: `True`) |
 | `snapshot_transactions` | `False` | Enable [snapshot transactions](/docs/SNAPSHOT_TRANSACTIONS.md) on connection (Default: `False`) |
-| `socket_timeout` | `10` | Socket timeout in seconds passed directly to websocket (Default: `10`) |
+| `connection_timeout` | `10` | Socket timeout in seconds used to establish connection (Default: `10`) |
+| `socket_timeout` | `20` | Socket timeout in seconds used for requests after connection was established (Default: `30`) |
 | `query_timeout` | `0` | Maximum execution time of queries before automatic abort (Default: `0`, no timeout) |
 | `compression` | `True` | Use zlib compression both for WebSocket and HTTP transport (Default: `False`) |
 | `encryption` | `True` | Use [SSL encryption](/docs/ENCRYPTION.md) for WebSocket communication and HTTP transport (Default: `False`) |
@@ -440,9 +453,17 @@ Closes result set handle if it was opened. You won't be able to fetch next chunk
 
 Execution time of SQL statement. It is measured by wall-clock time of WebSocket request, so real execution time is a bit faster. Returns `float`.
 
+
 ## ExaFormatter
 
 `ExaFormatter` inherits standard Python `string.Formatter`. It introduces set of placeholders to prevent SQL injections specifically in Exasol dynamic SQL queries. It also completely disabled `format_spec` section of standard formatting since it has no use in context of SQL queries and may cause more harm than good.
+
+You may access these functions using `.format` property of connection object. Example:
+
+```python
+C = pyexasol.connect(...)
+print(C.format.escape('abc'))
+```
 
 ### format()
 Formats SQL query using given arguments. Definition is the same as standard `format` function.
@@ -454,7 +475,7 @@ Accepts raw value. Converts it to `str` and replaces `'` (single-quote) with `''
 Accepts raw identifier. Converts it to `str` and replaces `"` (double-quote) with `""` (two double-quotes). May be useful on its own when escaping small parts of big identifiers.
 
 ### escape_like()
-Accepts raw value. Converts it to `str` and escapes for LIKE pattern value.
+Accepts raw value. Converts it to `str` and escapes for LIKE-pattern value.
 
 ### quote()
 Accepts raw value. Converts it to `str`, escapes it using `escape()` and wraps in `'` (single-quote). This is the primary function to pass arbitrary values to Exasol queries.
@@ -479,9 +500,150 @@ Accepts raw value. Converts it to `str` and validates it as float value for Exas
 ### safe_decimal()
 Accepts raw values. Converts it to `str` and validates it as decimal valie for Exasol. If value is not valid, throws `ValueError` exception.
 
+## ExaMetaData
+
+`ExaMetaData` provides convenient functions  to perform lock-free meta data requests using `/*snapshot execution*/` SQL hint and prepared statements. If you still get locks, please make sure to update Exasol server to the latest minor version.
+
+You may access these functions using `.meta` property of connection object. Example:
+
+```python
+C = pyexasol.connect(...)
+print(C.meta.sql_columns('SELECT 1 AS id'))
+```
+
+### sql_columns
+
+Return columns of SQL query result without executing it. Output format is similar to [ExaStatement.columns()](#columns).
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `query` | `SELECT * FROM {table:i} WHERE col1={col1}` | SQL query text, possibly with placeholders |
+| `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for placeholders |
+
+
+### schema_exists()
+
+Return `True` if schema exists, `False` otherwise.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `schema_name` | `FINANCE` | Schema name |
+
+### table_exists()
+
+Return `True` if table exists, `False` otherwise. If schema name was not specified, [current_schema](#current_schema) will be used instead.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `table_name` | `my_table`, `(my_schema, my_table)` | Table name (with optional schema name) |
+
+### view_exists()
+
+Returns `True` if view exists, `False` otherwise. If schema name was not specified, [current_schema](#current_schema) will be used instead.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `view_name` | `my_view`, `(my_schema, my_view)` | View name (with optional schema name) |
+
+### list_schemas()
+
+Return list of schemas from [EXA_SCHEMAS](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_SCHEMAS) system view matching LIKE-pattern.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `schema_name_pattern` | `FINANCE`, `TEST%` | Schema name LIKE-pattern |
+
+Patterns are case-sensitive. You may escape LIKE-patterns using [.format.escape_like()](#escape_like). Response contains all columns from system view and might change depending on Exasol server version.
+
+### list_tables()
+
+Return list of tables from [EXA_ALL_TABLES](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_ALL_TABLES) system view matching LIKE-pattern.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `table_schema_pattern` | `FINANCE`, `TEST%` | Schema name LIKE-pattern |
+| `table_name_pattern` | `MY_TABLE`, `PAYMENTS_%` | Table name LIKE-pattern |
+
+Patterns are case-sensitive. You may escape LIKE-patterns using [.format.escape_like()](#escape_like). Response contains all columns from system view and might change depending on Exasol server version.
+
+### list_views()
+
+Return list of views from [EXA_ALL_VIEWS](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_ALL_VIEWS) system view matching LIKE-pattern.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `view_schema_pattern` | `FINANCE`, `TEST%` | Schema name LIKE-pattern |
+| `view_name_pattern` | `MY_VIEW`, `PAYMENTS_VIEW_%` | View name LIKE-pattern |
+
+Patterns are case-sensitive. You may escape LIKE-patterns using [.format.escape_like()](#escape_like). Response contains all columns from system view and might change depending on Exasol server version.
+
+### list_columns()
+
+Return list of columns from [EXA_ALL_COLUMNS](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_ALL_COLUMNS) system view matching LIKE-pattern.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `column_schema_pattern` | `FINANCE`, `TEST%` | Schema name LIKE-pattern |
+| `column_table_pattern` | `MY_VIEW`, `PAYMENTS_VIEW_%` | Object name LIKE-pattern |
+| `column_table_type_pattern` | `TABLE`, `VIEW` | Object type LIKE-pattern |
+| `column_name_pattern` | `USER_ID`, `USER_ID%` | Column name LIKE-pattern |
+
+Patterns are case-sensitive. You may escape LIKE-patterns using [.format.escape_like()](#escape_like). Response contains all columns from system view and might change depending on Exasol server version.
+
+### list_objects()
+
+Return list of objects from [EXA_ALL_OBJECTS](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_ALL_OBJECTS) system view matching LIKE-pattern.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `object_name_pattern` | `MY_VIEW`, `PAYMENTS_VIEW_%` | Object name LIKE-pattern |
+| `object_type_pattern` | `TABLE`, `VIEW`, `FUNCTION` | Object type LIKE-pattern |
+| `owner_pattern` | `INGRES`, `SYS` | Owner (user or role) LIKE-pattern |
+| `root_name_pattern` | `FINANCE`, `TEST%` | Root name LIKE-pattern, it normally refers to schema name |
+
+Patterns are case-sensitive. You may escape LIKE-patterns using [.format.escape_like()](#escape_like). Response contains all columns from system view and might change depending on Exasol server version.
+
+### list_object_sizes()
+
+Return list of objects with sizes from [EXA_ALL_OBJECT_SIZES](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_ALL_OBJECT_SIZES) system view matching LIKE-pattern.
+
+Please note: object sizes do not include indices and statistics!
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `object_name_pattern` | `MY_VIEW`, `PAYMENTS_VIEW_%` | Object name LIKE-pattern |
+| `object_type_pattern` | `TABLE`, `VIEW`, `FUNCTION` | Object type LIKE-pattern |
+| `owner_pattern` | `INGRES`, `SYS` | Owner (user or role) LIKE-pattern |
+| `root_name_pattern` | `FINANCE`, `TEST%` | Root name LIKE-pattern, it normally refers to schema name |
+
+Patterns are case-sensitive. You may escape LIKE-patterns using [.format.escape_like()](#escape_like). Response contains all columns from system view and might change depending on Exasol server version.
+
+### list_indices()
+
+Return list of indices with sizes from [EXA_ALL_INDICES](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_ALL_INDICES) system view matching LIKE-pattern.
+
+| Argument | Example | Description |
+| --- | --- | --- |
+| `index_schema_pattern` | `FINANCE`, `TEST%` | Schema name LIKE-pattern |
+| `index_table_pattern` | `TABLE`, `VIEW`, `FUNCTION` | Table name LIKE-pattern |
+| `index_owner_pattern` | `INGRES`, `SYS` | Owner (user or role) LIKE-pattern |
+
+Patterns are case-sensitive. You may escape LIKE-patterns using [.format.escape_like()](#escape_like). Response contains all columns from system view and might change depending on Exasol server version.
+
+### list_sql_keywords()
+
+Return list of SQL keywords from [EXA_SQL_KEYWORDS](https://docs.exasol.com/sql_references/metadata/metadata_system_tables.htm#EXA_SQL_KEYWORDS) system view.
+
+These keywords cannot be used as identifiers without double quotes.
+
+Please try to avoid hardcoding this list. It might change depending on Exasol server version without warning.
+
+
 ## ExaHTTPTransportWrapper
 
 Wrapper for [parallel HTTP transport](/docs/HTTP_TRANSPORT_PARALLEL.md) used by child processes.
+
+You may create this wrapper using [http_transport()](#http_transport) function.
 
 ### ExaHTTPTransportWrapper.get_proxy()
 
@@ -515,9 +677,11 @@ Returns result of callback function
 
 This class provides additional capabilities to solve common Exasol-related problems which are normally out of scope of simple SQL driver. You should call `ExaConnection.ext` property in order to use those functions.
 
-For example:
+You may access these functions using `.ext` property of connection object. Example:
+
 ```python
-C.ext.get_columns('my_table')
+C = pyexasol.connect(...)
+print(C.ext.get_disk_space_usage())
 ```
 
 ### insert_multi()
@@ -535,61 +699,6 @@ You may use `columns` argument to specify custom order of columns for insertion.
 | `columns` | `['id', 'name']` | List of column names to specify custom order of columns |
 
 Please note that data should be presented in a row format. You may use `zip(*data_cols)` to convert columnar format into row format.
-
-### get_columns()
-
-Returns structure of table or view using WebSocket response format. Output is very similar to [ExaStatement.columns()](#columns).
-
-| Argument | Example | Description |
-| --- | --- | --- |
-| `object_name` | `my_table` `(my_schema, my_table)` | Object name or tuple |
-
-### get_columns_sql()
-
-Returns structure of SQL query result without executing it. Output is very similar to [ExaStatement.columns()](#columns).
-
-| Argument | Example | Description |
-| --- | --- | --- |
-| `query` | `SELECT * FROM {table:i} WHERE col1={col1}` | SQL query text, possibly with placeholders |
-| `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for placeholders |
-
-### get_sys_columns()
-
-Returns info about columns using Exasol system views. This is different from WebSocket response format.
-
-| Argument | Example | Description |
-| --- | --- | --- |
-| `object_name` | `my_table` `(my_schema, my_table)` | Object name or tuple |
-
-### get_sys_tables()
-
-Returns info about tables using Exasol system views.
-
-| Argument | Example | Description |
-| --- | --- | --- |
-| `schema` | `my_schema` | (optional) schema name (Default: current schema) |
-| `table_name_prefix` | `DIM_` | (optional) filter tables by name prefix (Default: all tables in schema) |
-
-### get_sys_views()
-
-Returns info about views using Exasol system views.
-
-| Argument | Example | Description |
-| --- | --- | --- |
-| `schema` | `my_schema` | (optional) schema name (Default: current schema) |
-| `view_name_prefix` | `DIM_` | (optional) filter views by name prefix (Default: all views in schema) |
-
-### get_sys_schemas()
-
-Returns info about schemas using Exasol system views.
-
-| Argument | Example | Description |
-| --- | --- | --- |
-| `schema_name_prefix` | `MUR_` | (optional) filter schemas by name prefix (Default: all schemas) |
-
-### get_reserved_words()
-
-Returns list of Exasol reserved words. Those words cannot be used as identifiers without quotes. It is a bad practice to hard-code such words in SQL driver code. This is list is constantly updated by Exasol during version upgrades, and it's a good idea to always fetch it for best possible results.
 
 ### get_disk_space_usage()
 

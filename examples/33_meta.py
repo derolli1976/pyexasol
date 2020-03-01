@@ -13,7 +13,7 @@ printer = pprint.PrettyPrinter(indent=4, width=140)
 C = pyexasol.connect(dsn=config.dsn, user=config.user, password=config.password, schema=config.schema)
 
 # Get columns without executing SQL query
-columns = C.meta.query_columns('SELECT a.*, a.user_id + 1 AS next_user_id FROM users a')
+columns = C.meta.sql_columns('SELECT a.*, a.user_id + 1 AS next_user_id FROM users a')
 printer.pprint(columns)
 
 
@@ -72,7 +72,8 @@ printer.pprint(val)
 
 
 # List columns with filters
-val = C.meta.list_columns(column_schema_pattern='PYEXASOL%', column_table_pattern='USERS%', column_name_pattern='%_ID%')
+val = C.meta.list_columns(column_schema_pattern='PYEXASOL%', column_table_pattern='USERS%'
+                          , column_object_type_pattern='TABLE', column_name_pattern='%_ID%')
 printer.pprint(val)
 
 

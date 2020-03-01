@@ -82,7 +82,7 @@ class ExaConnection(object):
         :param autocommit: Enable autocommit on connection (Default: True)
         :param snapshot_transactions: Enable snapshot transactions on connection (Default: False)
         :param connection_timeout: Socket timeout in seconds used to establish connection (Default: 10)
-        :param socket_timeout: Socket timeout in seconds used after connection was established (Default: 30)
+        :param socket_timeout: Socket timeout in seconds used for requests after connection was established (Default: 30)
         :param query_timeout: Maximum execution time of queries before automatic abort, in seconds (Default: 0, no timeout)
         :param compression: Use zlib compression both for WebSocket and HTTP transport (Default: False)
         :param encryption: Use SSL to encrypt client-server communications for WebSocket and HTTP transport (Default: False)
@@ -142,27 +142,31 @@ class ExaConnection(object):
         }
 
         self.login_info = {}
+        self.login_time = 0
         self.attr = {}
-        self.stmt_count = 0
         self.is_closed = False
-        self.connection_time = 0
 
         self.ws_host = None
         self.ws_port = None
         self.ws_req_count = 0
         self.ws_req_time = 0
 
-        self._last_stmt = None
-        self._udf_output_count = 0
+        self.last_stmt = None
+        self.stmt_count = 0
 
+        self.json_encode = None
+        self.json_decode = None
+
+        self._udf_output_count = 0
         self._req_lock = threading.Lock()
 
-        self._init_logger()
         self._init_format()
-        self._init_ws()
         self._init_json()
         self._init_ext()
         self._init_meta()
+
+        self._init_logger()
+        self._init_ws()
 
         self._login()
         self.get_attr()
@@ -172,9 +176,7 @@ class ExaConnection(object):
         Execute SQL query with optional query formatting parameters
         Return ExaStatement object
         """
-        self._last_stmt = self.cls_statement(self, query, query_params)
-
-        return self._last_stmt
+        return self.cls_statement(self, query, query_params)
 
     def execute_udf_output(self, query, query_params=None):
         """
@@ -432,10 +434,16 @@ class ExaConnection(object):
         return str(self.login_info.get('sessionId', ''))
 
     def last_statement(self) -> ExaStatement:
-        if self._last_stmt is None:
+        """
+        Returns last created ExaStatement object
+
+        It is mainly used for HTTP transport to access internal IMPORT / EXPORT query,
+        measure execution time and number of rows
+        """
+        if self.last_stmt is None:
             raise ExaRuntimeError(self, 'Last statement not found')
 
-        return self._last_stmt
+        return self.last_stmt
 
     def close(self):
         """
@@ -446,6 +454,7 @@ class ExaConnection(object):
             self._ws.close()
 
         self.is_closed = True
+        self.last_stmt = None
 
     def get_attr(self):
         ret = self.req({
@@ -460,7 +469,7 @@ class ExaConnection(object):
             'attributes': new_attr,
         })
 
-        # At this moment setAttributes response is inconsistent, so we have to fully refresh after every call
+        # At this moment setAttributes response is inconsistent, so attributes must be refreshed after every call
         self.get_attr()
 
     def get_nodes(self, pool_size=None):
@@ -491,7 +500,7 @@ class ExaConnection(object):
         local_req_count = self.ws_req_count
 
         # Build request
-        send_data = self._json_encode(req)
+        send_data = self.json_encode(req)
         self.logger.debug_json(f'WebSocket request #{local_req_count}', req)
 
         # Prevent and discourage attempts to use connection object from another thread simultaneously
@@ -515,7 +524,7 @@ class ExaConnection(object):
             self._req_lock.release()
 
         # Parse response
-        ret = self._json_decode(recv_data)
+        ret = self.json_decode(recv_data)
         self.logger.debug_json(f'WebSocket response #{local_req_count}', ret)
 
         # Updated attributes may be returned from any request
@@ -556,7 +565,7 @@ class ExaConnection(object):
             'command': 'abortQuery'
         }
 
-        send_data = self._json_encode(req)
+        send_data = self.json_encode(req)
         self.logger.debug_json('WebSocket abort request', req)
 
         try:
@@ -591,7 +600,7 @@ class ExaConnection(object):
             }
         })['responseData']
 
-        self.connection_time = time.time() - start_ts
+        self.login_time = time.time() - start_ts
 
         if self.options['compression']:
             self._ws_send = lambda x: self._ws.send_binary(zlib.compress(x.encode(), 1))
@@ -743,22 +752,22 @@ class ExaConnection(object):
         if self.options['json_lib'] == 'rapidjson':
             import rapidjson
 
-            self._json_encode = lambda x: rapidjson.dumps(x, number_mode=rapidjson.NM_NATIVE)
-            self._json_decode = lambda x: rapidjson.loads(x, number_mode=rapidjson.NM_NATIVE)
+            self.json_encode = lambda x: rapidjson.dumps(x, number_mode=rapidjson.NM_NATIVE)
+            self.json_decode = lambda x: rapidjson.loads(x, number_mode=rapidjson.NM_NATIVE)
 
         # ujson provides best performance in our tests, but it is abandoned by maintainers
         elif self.options['json_lib'] == 'ujson':
             import ujson
 
-            self._json_encode = ujson.dumps
-            self._json_decode = ujson.loads
+            self.json_encode = ujson.dumps
+            self.json_decode = ujson.loads
 
         # json from Python stdlib, very safe choice, but slow
         elif self.options['json_lib'] == 'json':
             import json
 
-            self._json_encode = json.dumps
-            self._json_decode = json.loads
+            self.json_encode = json.dumps
+            self.json_decode = json.loads
 
         else:
             raise ValueError(f"Unsupported json library [{self.options['json_lib']}]")
@@ -806,6 +815,5 @@ class ExaConnection(object):
         """
         try:
             self.close()
-            pass
         except Exception:
             pass

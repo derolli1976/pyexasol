@@ -7,26 +7,26 @@ matrix:
         -   python: 3.6
             env: EXASOL_TAG=latest
         -   python: 3.6
-            env: EXASOL_TAG=6.1.7-d1
+            env: EXASOL_TAG=6.1.8-d1
         -   python: 3.6
-            env: EXASOL_TAG=6.0.16-d1
+            env: EXASOL_TAG=6.0.17-d1
         -   python: 3.7
             env: EXASOL_TAG=latest
             dist: xenial
         -   python: 3.7
-            env: EXASOL_TAG=6.1.7-d1
+            env: EXASOL_TAG=6.1.8-d1
             dist: xenial
         -   python: 3.7
-            env: EXASOL_TAG=6.0.16-d1
+            env: EXASOL_TAG=6.0.17-d1
             dist: xenial
         -   python: 3.8
             env: EXASOL_TAG=latest
             dist: xenial
         -   python: 3.8
-            env: EXASOL_TAG=6.1.7-d1
+            env: EXASOL_TAG=6.1.8-d1
             dist: xenial
         -   python: 3.8
-            env: EXASOL_TAG=6.0.16-d1
+            env: EXASOL_TAG=6.0.17-d1
             dist: xenial
 
 services:
@@ -82,3 +82,5 @@ script:
     - python examples/31_context_manager.py
     - python examples/32_insert_multi.py
     - python examples/33_meta.py
+    - python examples/34_http_transport_errors.py
+    - python examples/35_garbage_collection.py
