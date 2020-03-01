@@ -83,7 +83,7 @@ This page contains complete reference of PyEXASOL public API.
   - [explain_last()](#explain_last)
 
 ## connect()
-Opens new connection and returns `ExaConnection` object.
+Open new connection and return `ExaConnection` object.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -116,7 +116,7 @@ Opens new connection and returns `ExaConnection` object.
 | `client_os_username` | `john` | Custom OS username displayed in Exasol sessions table (Default: `getpass.getuser()`) |
 
 ## connect_local_config()
-Opens new connection and returns `ExaConnection` object. It uses local .ini file (usually `~/.pyexasol.ini`) to read credentials and connection parameters. Please read [local config](/docs/LOCAL_CONFIG.md) page for more details.
+Open new connection and return `ExaConnection` object using local .ini file (usually `~/.pyexasol.ini`) to read credentials and connection parameters. Please read [local config](/docs/LOCAL_CONFIG.md) page for more details.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -125,7 +125,7 @@ Opens new connection and returns `ExaConnection` object. It uses local .ini file
 | `**kwargs` | - | All other arguments from [`connect`](#connect) method; `**kwargs` override values from config file |
 
 ## http_transport()
-Opens new HTTP connection and returns `ExaHTTPTransportWrapper` object. This function is part of [parallel HTTP transport API](/docs/HTTP_TRANSPORT_PARALLEL.md).
+Open new HTTP connection and return `ExaHTTPTransportWrapper` object. This function is a part of [parallel HTTP transport API](/docs/HTTP_TRANSPORT_PARALLEL.md).
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -149,7 +149,7 @@ Execute SQL statement with optional formatting.
 | `query` | `SELECT * FROM {table:i} WHERE col1={col1}` | SQL query text, possibly with placeholders |
 | `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for placeholders |
 
-Returns instance of `ExaStatement`
+Return instance of `ExaStatement`
 
 ### execute_udf_output()
 Execute SQL statement with optional formatting. Capture [output](/docs/SCRIPT_OUTPUT.md) of UDF scripts.
@@ -159,7 +159,7 @@ Execute SQL statement with optional formatting. Capture [output](/docs/SCRIPT_OU
 | `query` | `SELECT * FROM {table:i} WHERE col1={col1}` | SQL query text, possibly with placeholders |
 | `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for placeholders |
 
-Returns tuple with two elements: (1) instance of `ExaStatement` and (2) list of `Path` objects for script output log files.
+Return tuple with two elements: (1) instance of `ExaStatement` and (2) list of `Path` objects for script output log files.
 
 Exasol should be able to open connection to the host where current script is running. It is usually OK in the same data centre, but it is normally not working if you try to run this function on local laptop.
 
@@ -195,10 +195,10 @@ Wrapper for `OPEN SCHEMA`
 | `schema` | `ingres` | Schema name |
 
 ### current_schema()
-Returns name of currently opened schema. Returns empty string if no schema was opened.
+Return name of currently opened schema. Return empty string if no schema was opened.
 
 ### export_to_file()
-Exports big amount of data from Exasol to file or file-like object using fast HTTP transport.
+Export large amount of data from Exasol to file or file-like object using fast HTTP transport.
 File must be opened in binary mode.
 
 | Argument | Example | Description |
@@ -209,7 +209,7 @@ File must be opened in binary mode.
 | `export_params` | `{'with_column_names': True}` | (optional) Custom parameters for EXPORT query |
 
 ### export_to_list()
-Exports big amount of data from Exasol to basic Python `list` using fast HTTP transport. This function may run out of memory.
+Export large amount of data from Exasol to basic Python `list` using fast HTTP transport. This function may run out of memory.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -217,10 +217,10 @@ Exports big amount of data from Exasol to basic Python `list` using fast HTTP tr
 | `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for SQL query placeholders |
 | `export_params` | `{'encoding': 'LATIN1'}` | (optional) Custom parameters for EXPORT query |
 
-Returns `list` of `tuples`
+Return `list` of `tuples`.
 
 ### export_to_pandas()
-Exports big amount of data from Exasol to `pandas.DataFrame`. This function may run out of memory.
+Export large amount of data from Exasol to `pandas.DataFrame`. This function may run out of memory.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -228,10 +228,10 @@ Exports big amount of data from Exasol to `pandas.DataFrame`. This function may 
 | `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for SQL query placeholders |
 | `export_params` | `{'encoding': 'LATIN1'}` | (optional) Custom parameters for EXPORT query |
 
-Returns instance of `pandas.DataFrame`
+Return instance of `pandas.DataFrame`
 
 ### export_to_callback()
-Exports big amount of data to user-defined callback function
+Export large amount of data to user-defined callback function
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -241,7 +241,7 @@ Exports big amount of data to user-defined callback function
 | `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for SQL query placeholders |
 | `export_params` | `{'with_column_names': True}` | (optional) Custom parameters for EXPORT query |
 
-Returns result of callback function
+Return result of callback function
 
 ### export_parallel()
 This function is part of [parallel HTTP transport API](/docs/HTTP_TRANSPORT_PARALLEL.md). It accepts list of proxy `host:port` strings obtained from all child processes and executes parallel export query. Parent process only monitors the execution of query. All actual work is performed in child processes.
@@ -253,10 +253,10 @@ This function is part of [parallel HTTP transport API](/docs/HTTP_TRANSPORT_PARA
 | `query_params` | `{'table': 'users', 'col1':'bar'}` | (optional) Values for SQL query placeholders |
 | `export_params` | `{'with_column_names': True}` | (optional) Custom parameters for EXPORT query |
 
-Returns nothing on successful export. You may access `EXPORT` statement results using [`last_statement()`](#last_statement) function.
+Return nothing on successful export. You may access `EXPORT` statement results using [`last_statement()`](#last_statement) function.
 
 ### import_from_file()
-Imports big amount of data from file or file-like object to Exasol. File must be opened in binary mode.
+Import large amount of data from file or file-like object to Exasol. File must be opened in binary mode.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -265,7 +265,7 @@ Imports big amount of data from file or file-like object to Exasol. File must be
 | `import_params` | `{'column_separator: ','}` | (optional) Custom parameters for IMPORT query |
 
 ### import_from_iterable()
-Imports big amount of data from `iterable` Python object to Exasol. Iterator must return tuples of values.
+Import large amount of data from `iterable` Python object to Exasol. Iterator must return tuples of values.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -274,7 +274,7 @@ Imports big amount of data from `iterable` Python object to Exasol. Iterator mus
 | `import_params` | `{'column_separator: ','}` | (optional) Custom parameters for IMPORT query |
 
 ### import_from_pandas()
-Imports big amount of data from `pandas.DataFrame` to Exasol.
+Import large amount of data from `pandas.DataFrame` to Exasol.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -283,7 +283,7 @@ Imports big amount of data from `pandas.DataFrame` to Exasol.
 | `import_params` | `{'column_separator: ','}` | (optional) Custom parameters for IMPORT query |
 
 ### import_from_callback()
-Imports big amount of data from user-defined callback function to Exasol.
+Import large amount of data from user-defined callback function to Exasol.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -302,15 +302,15 @@ This function is part of [parallel HTTP transport API](/docs/HTTP_TRANSPORT_PARA
 | `table` | `table` `(schema, table)` | Destination table for import |
 | `import_params` | `{'column_separator': ','}` | (optional) Custom parameters for IMPORT query |
 
-Returns nothing on successful export. You may access `IMPORT` statement results using [`last_statement()`](#last_statement) function.
+Return nothing on successful export. You may access `IMPORT` statement results using [`last_statement()`](#last_statement) function.
 
 ### get_nodes()
 
-Returns list of currently active Exasol nodes which is normally used for [parallel HTTP transport](/docs/HTTP_TRANSPORT_PARALLEL.md).
+Return list of currently active Exasol nodes which is normally used for [parallel HTTP transport](/docs/HTTP_TRANSPORT_PARALLEL.md).
 
 | Argument | Example | Description |
 | --- | --- | --- |
-| `pool_size` | `10` | (optional) Returns list of specific size |
+| `pool_size` | `10` | (optional) Return list of specific size |
 
 Result format: `[{'host': <ip_address>, 'port': <port>, 'idx': <incremental index of returned node>}]`
 
@@ -319,12 +319,12 @@ If `pool_size` is bigger than number of nodes, list will wrap around and nodes w
 Exasol shuffles list for every connection.
 
 ### session_id()
-Returns unique `SESSION_ID` of the current session.
+Return unique `SESSION_ID` of the current session. Return value type is `str`.
 
 ### last_statement()
-Get last `ExaStatement` object. May be useful while working with `export_*` and `import_*` functions normally returning result of callback function instead of statement object.
+Get last `ExaStatement` object. It is useful while working with `export_*` and `import_*` functions normally returning result of callback function instead of statement object.
 
-Returns instance of `ExaStatement`.
+Return instance of `ExaStatement`.
 
 ### abort_query()
 Abort running query.
@@ -396,7 +396,7 @@ Iterator yields `tuple` or `dict` depending on `fetch_dict` connection option.
 ### fetchone()
 Fetches one row.
 
-Returns `tuple` or `dict`. Returns `None` if all rows were fetched.
+Return `tuple` or `dict`. Return `None` if all rows were fetched.
 
 ### fetchmany()
 Fetches multiple rows.
@@ -405,29 +405,31 @@ Fetches multiple rows.
 | --- | --- | --- |
 | `size` | `100` | Set the specific amount of rows to fetch (Default: `10000`) |
 
-Returns `list` of `tuples` or `list` of `dict`. Returns empty `list` if all rows were fetched.
+Return `list` of `tuples` or `list` of `dict`. Return empty `list` if all rows were fetched previously.
 
 ### fetchall()
 Fetches all remaining rows. This function may run out of memory.
 
-Returns `list` of `tuples` or `list` of `dict`. Returns empty `list` if all rows were fetched.
+Return `list` of `tuples` or `list` of `dict`. Return empty `list` if all rows were fetched previously.
 
 ### fetchcol()
 Fetches all values from first column.
 
-Returns `list` of values. Returns empty `list` if all rows were fetched.
+Return `list` of values. Return empty `list` if all rows were fetched previously.
 
 ### fetchval()
 Fetches first column of first row. It may be useful for queries returning single value like `SELECT count(*) FROM table`.
 
-Returns value. Returns `None` if all rows were fetched.
+Return value. Return `None` if all rows were fetched previously.
 
 ### rowcount()
-- Returns total amount of selected rows for statements with result set (`num_rows`).
-- Returns total amount of processed rows for DML queries (`row_count`).
+Depending on the type of query:
+
+- Return total amount of selected rows for statements with result set (`num_rows`).
+- Return total amount of processed rows for DML queries (`row_count`).
 
 ### columns()
-Returns `dict` with keys as `column names` and values as `dataType` objects defined in Exasol WebSocket protocol.
+Return `dict` with keys as `column names` and values as `dataType` objects defined in Exasol WebSocket protocol.
 
 | Names | Type | Description |
 | --- | --- | --- |
@@ -444,14 +446,14 @@ Since the minimum supported version of Python is 3.6, the order of `dict` preser
 
 ### column_names()
 
-Returns `list` of column names.
+Return `list` of column names.
 
 ### ExaStatement.close()
 Closes result set handle if it was opened. You won't be able to fetch next chunk of large dataset after calling this function, but no other side-effects.
 
 ### .execution_time
 
-Execution time of SQL statement. It is measured by wall-clock time of WebSocket request, so real execution time is a bit faster. Returns `float`.
+Execution time of SQL statement. It is measured by wall-clock time of WebSocket request, so real execution time is a bit faster. Return `float`.
 
 
 ## ExaFormatter
@@ -539,7 +541,7 @@ Return `True` if table exists, `False` otherwise. If schema name was not specifi
 
 ### view_exists()
 
-Returns `True` if view exists, `False` otherwise. If schema name was not specified, [current_schema](#current_schema) will be used instead.
+Return `True` if view exists, `False` otherwise. If schema name was not specified, [current_schema](#current_schema) will be used instead.
 
 | Argument | Example | Description |
 | --- | --- | --- |
@@ -647,7 +649,7 @@ You may create this wrapper using [http_transport()](#http_transport) function.
 
 ### ExaHTTPTransportWrapper.get_proxy()
 
-Returns proxy `host:port` string. Those strings should be passed from child processes to parent process and used as argument for [`export_parallel()`](#export_parallel) and [`import_parallel()`](#import_parallel) functions.
+Return proxy `host:port` string. Those strings should be passed from child processes to parent process and used as argument for [`export_parallel()`](#export_parallel) and [`import_parallel()`](#import_parallel) functions.
 
 ### ExaHTTPTransportWrapper.export_to_callback()
 
@@ -659,7 +661,7 @@ Exports chunk of data using callback function. You may use exactly the same call
 | `dst` | `anything` | (optional) Export destination for callback function |
 | `callback_params` | `{'a': 'b'}` | (optional) Dict with additional parameters for callback function |
 
-Returns result of callback function
+Return result of callback function
 
 ### ExaHTTPTransportWrapper.import_from_callback()
 
@@ -671,7 +673,7 @@ Import chunk of data using callback function. You may use exactly the same callb
 | `src` | `anything` | (optional) Import source for callback function |
 | `callback_params` | `{'a': 'b'}` | (optional) Dict with additional parameters for callback function |
 
-Returns result of callback function
+Return result of callback function
 
 ## ExaExtension
 
