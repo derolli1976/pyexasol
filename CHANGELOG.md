@@ -10,6 +10,7 @@
 - `ExaStatement` should now properly release result set handle after fetching large result set and on object termination;
 - Removed `weakref`, it was not related to previous garbage collector problems;
 - Renamed previously added `.connection_time` to `.login_time`, which is more accurate name for this timer;
+- Query text length in `ExaQueryError` exception is now limited to 20k characters to prevent logs from bloating;
 
 ## [0.11.2] - 2020-01-27
 
