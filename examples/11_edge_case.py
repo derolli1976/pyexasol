@@ -11,9 +11,6 @@ import decimal
 import pprint
 printer = pprint.PrettyPrinter(indent=4, width=140)
 
-# Basic connect
-C = pyexasol.connect(dsn=config.dsn, user=config.user, password=config.password, schema=config.schema)
-
 edge_cases = [
     # Biggest values
     {
@@ -50,71 +47,59 @@ edge_cases = [
     }
 ]
 
-insert_q = 'INSERT INTO edge_case VALUES ({dec36_0!d}, {dec36_36!d}, {dbl!f}, {bl}, {dt}, {ts}, {var100}, {var2000000})'
-select_q = 'SELECT dec36_0, dec36_36, dbl, bl, dt, ts, var100, LENGTH(var2000000) AS len_var FROM edge_case'
-
-C.execute('TRUNCATE TABLE edge_case')
-
-# Insert (test formatting)
-C.execute(insert_q, dict(edge_cases[0]))
-C.execute(insert_q, dict(edge_cases[1]))
-C.execute(insert_q, dict(edge_cases[2]))
-
-# Select and fetch
-stmt = C.execute(select_q)
-printer.pprint(stmt.fetchall())
-
-
-# Same actions with "exasol_mapper"
-C.fetch_mapper = pyexasol.exasol_mapper
-C.execute('TRUNCATE TABLE edge_case')
-
-# Insert (test formatting)
-C.execute(insert_q, dict(edge_cases[0]))
-C.execute(insert_q, dict(edge_cases[1]))
-C.execute(insert_q, dict(edge_cases[2]))
-
-# Select and fetch
-stmt = C.execute(select_q)
-printer.pprint(stmt.fetchall())
-
-# Import and export
-edge_tuples = C.execute("SELECT * FROM edge_case").fetchall()
-
-C.execute('TRUNCATE TABLE edge_case')
-
-C.import_from_iterable(edge_tuples, 'edge_case')
-stmt = C.last_statement()
-print(f'IMPORTED {stmt.rowcount()} rows in {stmt.execution_time}s')
-
-res = C.export_to_list(select_q)
-stmt = C.last_statement()
-print(f'EXPORTED {stmt.rowcount()} rows in {stmt.execution_time}s')
-printer.pprint(res)
-
 # Very large query
-stmt = C.execute('SELECT {val1} AS val1, {val2} AS val2, {val3} AS val3, {val4} AS val4, {val5} AS val5', {
-    'val1': edge_cases[0]['var2000000'],
-    'val2': edge_cases[0]['var2000000'],
-    'val3': edge_cases[0]['var2000000'],
-    'val4': edge_cases[0]['var2000000'],
-    'val5': edge_cases[0]['var2000000'],
-})
+C = pyexasol.connect(dsn=config.dsn, user=config.user, password=config.password, schema=config.schema)
 
-print(f'Query length: {len(stmt.query)}')
-print(f'Result column length: {len(stmt.fetchone()[0])}')
+try:
+    stmt = C.execute('SELECT {val1} AS val1, {val2} AS val2, {val3} AS val3, {val4} AS val4, {val5} AS val5', {
+        'val1': edge_cases[0]['var2000000'],
+        'val2': edge_cases[0]['var2000000'],
+        'val3': edge_cases[0]['var2000000'],
+        'val4': edge_cases[0]['var2000000'],
+        'val5': edge_cases[0]['var2000000'],
+    })
+
+    print(f'Query length: {len(stmt.query)}')
+    print(f'Result column length: {len(stmt.fetchone()[0])}')
+
+except pyexasol.ExaQueryError as e:
+    print(e)
+
+# Very large query with encryption
+C = pyexasol.connect(dsn=config.dsn, user=config.user, password=config.password, schema=config.schema
+                     , encryption=True)
+
+try:
+    stmt = C.execute('SELECT {val1} AS val1, {val2} AS val2, {val3} AS val3, {val4} AS val4, {val5} AS val5', {
+        'val1': edge_cases[0]['var2000000'],
+        'val2': edge_cases[0]['var2000000'],
+        'val3': edge_cases[0]['var2000000'],
+        'val4': edge_cases[0]['var2000000'],
+        'val5': edge_cases[0]['var2000000'],
+    })
+
+    print(f'Query length: {len(stmt.query)}')
+    print(f'Result column length: {len(stmt.fetchone()[0])}')
+
+except pyexasol.ExaQueryError as e:
+    print(e)
+
 
 # Very large query with compression
 C = pyexasol.connect(dsn=config.dsn, user=config.user, password=config.password, schema=config.schema
-                     , compression=True, encryption=True)
+                     , compression=True)
 
-stmt = C.execute('SELECT {val1} AS val1, {val2} AS val2, {val3} AS val3, {val4} AS val4, {val5} AS val5', {
-    'val1': edge_cases[0]['var2000000'],
-    'val2': edge_cases[0]['var2000000'],
-    'val3': edge_cases[0]['var2000000'],
-    'val4': edge_cases[0]['var2000000'],
-    'val5': edge_cases[0]['var2000000'],
-})
+try:
+    stmt = C.execute('SELECT {val1} AS val1, {val2} AS val2, {val3} AS val3, {val4} AS val4, {val5} AS val5', {
+        'val1': edge_cases[0]['var2000000'],
+        'val2': edge_cases[0]['var2000000'],
+        'val3': edge_cases[0]['var2000000'],
+        'val4': edge_cases[0]['var2000000'],
+        'val5': edge_cases[0]['var2000000'],
+    })
 
-print(f'Query length: {len(stmt.query)}')
-print(f'Result column length: {len(stmt.fetchone()[0])}')
+    print(f'Query length: {len(stmt.query)}')
+    print(f'Result column length: {len(stmt.fetchone()[0])}')
+
+except pyexasol.ExaQueryError as e:
+    print(e)
